@@ -14,7 +14,6 @@
   - [Usage](#usage)
   - [License](#license)
 
-
 ## Overview
 
 This is a plugin that allows you to execute [`mise`](https://github.com/jdx/mise) commands using keyboard shortcuts utilizing [`fzf`](https://github.com/junegunn/fzf) and [`mise`](https://github.com/jdx/mise).
@@ -22,6 +21,7 @@ This is a plugin that allows you to execute [`mise`](https://github.com/jdx/mise
 ## Installation
 
 ### Install [fzf](https://github.com/junegunn/fzf) using Homebrew
+
 ```shell
 brew install fzf
 ```
@@ -36,7 +36,7 @@ wget -O ~/.fzfmise https://raw.githubusercontent.com/gumob/fzf-mise/main/fzf-mis
 
 ### How to set up using key bindings
 
-Source `fzf` and `fzfmise` in your run command shell.<br/>
+Source `fzf` and `fzfmise` in your run command shell.
 By default, no key bindings are set. If you want to set the key binding to `Ctrl+K`, please configure it as follows:
 
 #### Zsh
@@ -59,6 +59,7 @@ source ~/.fzfmise
 ```
 
 Source run command
+
 ```shell
 source ~/.zshrc
 ```
@@ -83,6 +84,7 @@ source ~/.fzfmise
 ```
 
 Source run command
+
 ```shell
 source ~/.bashrc
 ```
@@ -98,6 +100,7 @@ To run `fzf-mise` without using the keyboard shortcut, enter the following comma
 ```shell
 fzf-mise
 ```
+
 ## License
 
 This project is licensed under the MIT License. The MIT License is a permissive free software license that allows for the reuse, modification, distribution, and sale of the software. It requires that the original copyright notice and license text be included in all copies or substantial portions of the software. The software is provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement.
