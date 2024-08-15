@@ -80,8 +80,6 @@ function fzf-mise() {
     fi
     echo "" && echo $version
     return 0
-
-    # mise plugin ls --core | fzf --ansi --prompt="[mise] Select a plugin > " | xargs -I{} sh -c 'mise ls-remote "{}" | fzf --ansi --prompt="[mise] Select a version > "' | tr -d '\n' | tee >(if command -v pbcopy &> /dev/null; then pbcopy; elif command -v xclip &> /dev/null; then xclip -selection clipboard; else echo "No clipboard utility found"; fi)
   }
 
   local fzf-mise-install() {
@@ -89,14 +87,6 @@ function fzf-mise() {
     version=$(mise ls-remote "$plugin" | fzf --ansi --prompt="mise install ${plugin} > " | awk '{print $1}')
     echo && mise install "${plugin}@${version}"
     return 0
-
-    # mise plugin ls --core | fzf --ansi --prompt="mise install > " | \
-    #   while read -r plugin; do
-    #     version=$(mise ls-remote "$plugin" | fzf --ansi --prompt="mise install ${plugin} > " | awk '{print $1}')
-    #     if [ -n "$plugin" ] && [ -n "$version" ] && ; then
-    #       echo && mise install "${plugin}@${version}"
-    #     fi
-    #   done
   }
 
   local fzf-mise-uninstall() {
@@ -104,13 +94,6 @@ function fzf-mise() {
     version=$(mise ls "$plugin" | fzf --ansi --prompt="mise uninstall ${plugin} > " | awk '{print $2}')
     echo && mise uninstall "${plugin}@${version}"
     return 0
-    # mise plugin ls --core | fzf --ansi --prompt="mise uninstall > " | \
-    #   while read -r plugin; do
-    #     version=$(mise ls "$plugin" | fzf --ansi --prompt="mise uninstall ${plugin} > " | awk '{print $2}')
-    #     if [ -n "$version" ]; then
-    #       echo && mise uninstall "${plugin}@${version}"
-    #     fi
-    #   done
   }
 
   local fzf-mise-upgrade() {
@@ -152,32 +135,6 @@ function fzf-mise() {
 
     mise prune "$plugin"
     return 0
-
-#     if [ -n "$plugin" ]; then
-#       header=$(cat <<EOF
-
-# $(tput setaf 4)Are you sure you want to prune ${plugin}?$(tput sgr0)
-
-# $(tput bold)Remain$(tput sgr0)
-# $(tput setaf 7)$(printf "%s\n" "${remain[@]}")$(tput sgr0)
-
-# $(tput bold)Uninstall$(tput sgr0)
-# $(tput setaf 7)$(printf "%s\n" "${uninstall[@]}")$(tput sgr0)
-
-# Yes
-# No
-# EOF
-#       )
-#       header_lines=$(echo "${header}" | wc -l)
-#       header_lines=$((header_lines - 2))
-#       response=$(echo -e "${header}" | fzf --prompt="mise prune ${plugin} > " --header-lines=$header_lines)
-
-#       if [[ "$response" =~ ^[Yy][Ee][Ss]$ ]]; then
-#         mise prune "$plugin"
-#       elif [[ "$response" =~ ^[Nn][Oo]$ ]]; then
-#         echo "Canceled."
-#       fi
-#     fi
   }
 
   local fzf-mise-plugins() {
@@ -188,8 +145,9 @@ function fzf-mise() {
       " "
       "$(tput bold)ls:$(tput sgr0)               List installed plugins"
       "$(tput bold)ls-remote:$(tput sgr0)        List all available remote plugins"
-      " "
-      "$(tput bold)link:$(tput sgr0)             Symlinks a plugin into mise"
+      # TODO: implement link
+      # " "
+      # "$(tput bold)link:$(tput sgr0)             Symlinks a plugin into mise"
     )
     command=$(__parse_options "mise plugins" ${option_list[@]})
     if [ $? -eq 1 ]; then
@@ -274,6 +232,139 @@ function fzf-mise() {
     echo && mise plugins link --help
   }
 
+  local fzf-mise-direnv() {
+
+  }
+
+  local fzf-mise-env() {
+    mise env
+  }
+
+  local fzf-mise-set() {
+    local option_list=(
+      "$(tput bold)set:$(tput sgr0)                               List available environment variables"
+      "$(tput bold)set <KEY>:$(tput sgr0)                         Display the value of an environment variable"
+      "$(tput bold)set <KEY>=<VALUE>:$(tput sgr0)                 Set the value of an environment variable"
+      "$(tput bold)set <KEY>=<VALUE> --global:$(tput sgr0)        Set the value of an environment variable globally"
+      # TODO: implement set <KEY>=<VALUE> --file <FILE>
+      # "$(tput bold)set <KEY>=<VALUE> --file <FILE>:$(tput sgr0)   Set the value of an environment variable in a file"
+    )
+    command=$(__parse_options "mise plugins" ${option_list[@]})
+    if [ $? -eq 1 ]; then
+        return 1
+    fi
+    case "$command" in
+      "set") mise set;;
+      "set <KEY>") fzf-mise-set-name;;
+      "set <KEY>=<VALUE>") fzf-mise-set-name-value;;
+      "set <KEY>=<VALUE> --global") fzf-mise-set-name-value-global "mise plugins ls-remote";;
+      "set <KEY>=<VALUE> --file <FILE>") fzf-mise-set-name-value-file;;
+      *) echo "Error: Unknown command 'mise $command'" ;;
+    esac
+    return 0
+  }
+
+  local fzf-mise-set-name() {
+    local envs=$(mise set)
+    if [ -z "$envs" ]; then
+        echo "\nNo environment variables set"
+        return 1
+    fi
+
+    local env=$(echo $envs | fzf --ansi --prompt="mise set > ")
+
+    read -r env_name env_value env_file <<< "$env"
+    echo "${env_name}=$(mise set $env_name)"
+    return 0
+  }
+
+  local __fzf-mise-set-name-value() {
+    local option=$1
+    local prompt=$2
+    local prompt_key=$(cat <<EOF
+$(tput setaf 4)
+mise set ${option}
+$(tput sgr0)
+EOF
+)
+    local retval=$(echo -e "$prompt_key" | fzf --ansi --pointer="" --no-mouse --marker="" --disabled --print-query --no-separator --no-info --layout=reverse-list --height=~100% --prompt="Enter value for ${prompt} > ")
+
+    if [ -z "$retval" ]; then
+      return 1
+    fi
+    echo "$retval"
+    return 0
+  }
+
+  local fzf-mise-set-name-value() {
+    local env_key=$(__fzf-mise-set-name-value "<KEY>=<VALUE>" "<KEY>")
+    [ $? -ne 0 ] && { echo "Failed to get value."; return 1; }
+    local env_value=$(__fzf-mise-set-name-value "${env_key}=<VALUE>" "<VALUE>")
+    [ $? -ne 0 ] && { echo "Failed to get value."; return 1; }
+
+    local toml_file=${$(pwd)%/}"/.mise.toml"
+    mise set --quiet "${env_key}=${env_value}"
+    mise trust --quiet $toml_file
+    echo
+    mise set
+    return 0
+  }
+
+  local fzf-mise-set-name-value-global() {
+    local env_key=$(__fzf-mise-set-name-value "--global <KEY>=<VALUE>" "<KEY>")
+    [ $? -ne 0 ] && { echo "Failed to get value."; return 1; }
+    local env_value=$(__fzf-mise-set-name-value "--global ${env_key}=<VALUE>" "<VALUE>")
+    [ $? -ne 0 ] && { echo "Failed to get value."; return 1; }
+    local toml_file="${HOME}/.config/mise/config.toml"
+    mise set --quiet --global "${env_key}=${env_value}"
+    # mise trust --quiet $toml_file
+    echo
+    mise set
+    return 0
+  }
+
+  local fzf-mise-set-name-value-file() {
+    local env_key=$(__fzf-mise-set-name-value "--file <TOML_FILE> <KEY>=<VALUE>" "<KEY>")
+    [ $? -ne 0 ] && { echo "Failed to get value."; return 1; }
+    local env_value=$(__fzf-mise-set-name-value "--file <TOML_FILE> ${env_key}=<VALUE>" "<VALUE>")
+    [ $? -ne 0 ] && { echo "Failed to get value."; return 1; }
+    local toml_file=$(__fzf-mise-set-name-value "--file <TOML_FILE> ${env_key}=${env_value}" "<TOML_FILE>")
+    [ $? -ne 0 ] && { echo "Failed to get value."; return 1; }
+    [ -f "$toml_file" ] || echo "[env]" > "$toml_file"
+    mise set --quiet --file $toml_file "${env_key}=${env_value}"
+    mise trust --quiet $toml_file
+    echo
+    mise set --file $toml_file
+    return 0
+  }
+
+  local fzf-mise-unset() {
+    local envs=$(mise set)
+    if [ -z "$envs" ]; then
+        echo "\nNo environment variables set"
+        return 1
+    fi
+
+    local env=$(echo $envs | fzf --ansi --prompt="mise unset > ")
+
+    read -r env_name env_value env_file <<< "$env"
+    env_file=${env_file/#\~/$HOME}
+    echo "env_file: $env_file"
+    local local_toml=${$(pwd)%/}"/.mise.toml"
+    local global_toml="${HOME}/.config/mise/config.toml"
+
+    if [ "$env_file" = "$local_toml" ]; then
+      mise unset "$env_name"
+    elif [ "$env_file" = "$global_toml" ]; then
+      mise unset "$env_name" --global
+    else
+      mise unset "$env_name" --file "$env_file"
+    fi
+    echo
+    mise set
+    return 0
+  }
+
   ######################
   ### Entry Point
   ######################
@@ -296,10 +387,12 @@ function fzf-mise() {
       "$(tput bold)ls:$(tput sgr0)           List installed and active tool versions"
       "$(tput bold)ls-remote:$(tput sgr0)    List runtime versions available for install"
       " "
-      "$(tput bold)direnv:$(tput sgr0)       Output direnv function to use mise inside direnv"
-      "$(tput bold)env:$(tput sgr0)          Exports env vars to activate mise a single time"
       "$(tput bold)set:$(tput sgr0)          Manage environment variables"
       "$(tput bold)unset:$(tput sgr0)        Remove environment variable(s) from the config file"
+      # TODO: implement direnv
+      # "$(tput bold)direnv:$(tput sgr0)       Output direnv function to use mise inside direnv"
+      # TODO: implement env
+      # "$(tput bold)env:$(tput sgr0)          Exports env vars to activate mise a single time"
     )
 
     command=$(__parse_options "mise" ${option_list[@]})
@@ -327,10 +420,11 @@ function fzf-mise() {
       ls) fzf-mise-ls;;
       ls-remote) fzf-mise-ls-remote;;
 
-      direnv) ;;
-      env) ;;
-      set) ;;
-      unset) ;;
+      direnv) fzf-mise-direnv;;
+      env) fzf-mise-env;;
+
+      set) fzf-mise-set;;
+      unset) fzf-mise-unset;;
       *) echo "Error: Unknown command 'mise $command'" ;;
     esac
 
