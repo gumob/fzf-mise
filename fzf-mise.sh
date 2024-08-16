@@ -3,6 +3,7 @@ function fzf-mise() {
   ######################
   ### Option Parser
   ######################
+
   local __parse_options (){
     local prompt="$1" && shift
     local option_list
@@ -51,6 +52,7 @@ function fzf-mise() {
   ######################
   ### mise commands
   ######################
+
   local fzf-mise-use() {
     mise plugin ls --core | fzf --ansi --prompt="mise use > " | \
       while read -r plugin; do
@@ -279,6 +281,7 @@ function fzf-mise() {
   }
 
   local __fzf-mise-set-name-value() {
+    ### This function prompts the user to enter a value for a specific option in the 'mise set' command.
     local option=$1
     local prompt=$2
     local prompt_key=$(cat <<EOF
@@ -287,11 +290,13 @@ mise set ${option}
 $(tput sgr0)
 EOF
 )
+    ### The following line uses fzf to display the prompt and capture the user's input.
     local retval=$(echo -e "$prompt_key" | fzf --ansi --pointer="" --no-mouse --marker="" --disabled --print-query --no-separator --no-info --layout=reverse-list --height=~100% --prompt="Enter value for ${prompt} > ")
-
+    ### If the user did not enter a value, return an error code.
     if [ -z "$retval" ]; then
       return 1
     fi
+    ### Output the entered value.
     echo "$retval"
     return 0
   }
@@ -368,6 +373,7 @@ EOF
   ######################
   ### Entry Point
   ######################
+
   local init() {
     local option_list=(
       "$(tput bold)use:$(tput sgr0)          Install tool version and add it to config"
