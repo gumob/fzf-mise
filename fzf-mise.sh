@@ -138,6 +138,30 @@ function fzf-mise() {
     return 0
   }
 
+  local fzf-mise-venv() {
+    local prompt_key=$(cat <<EOF
+$(tput setaf 4)
+.venv                           # Relative to this file's directory
+/root/.venv                     # Can be absolute path
+{{env.HOME}}/.cache/venv/myproj # Can use templates
+$(tput sgr0)
+EOF
+)
+    local venv_path=$(echo -e "$prompt_key" | fzf --ansi --pointer="" --no-mouse --marker="" --disabled --print-query --no-separator --no-info --layout=reverse-list --height=~100% --prompt="Enter path for virtualenv > ")
+    local toml_file=${$(pwd)%/}"/.mise.toml"
+    local venv_value="{ path = \"${venv_path}\", create = true }"
+    if grep -q '_.python.venv' "$toml_file"; then
+      python -m venv "$venv_path"
+      sed -i '' "s/_.python.venv = .*/_.python.venv = \"${venv_path}\"/g" "${toml_file}"
+    else
+      python -m venv "$venv_path"
+      mise set --quiet "_.python.venv=${venv_path}"
+      sed -i '' "s/\"_.python.venv\"/_.python.venv/g" "${toml_file}"
+    fi
+    mise trust --quiet $toml_file
+    return 0
+  }
+
   local fzf-mise-plugins() {
     local option_list=(
       "$(tput bold)install:$(tput sgr0)          Install a plugin"
@@ -293,7 +317,7 @@ EOF
     if [ -z "$retval" ]; then
       return 1
     fi
-    echo "$retval"
+    echo $retval
     return 0
   }
 
@@ -304,7 +328,7 @@ EOF
     [ $? -ne 0 ] && { echo "Failed to get value."; return 1; }
 
     local toml_file=${$(pwd)%/}"/.mise.toml"
-    mise set --quiet "${env_key}=${env_value}"
+    mise set --quiet ${env_key}=${env_value}
     mise trust --quiet $toml_file
     echo
     mise set
@@ -317,7 +341,7 @@ EOF
     local env_value=$(__fzf-mise-set-name-value "--global ${env_key}=<VALUE>" "<VALUE>")
     [ $? -ne 0 ] && { echo "Failed to get value."; return 1; }
     local toml_file="${HOME}/.config/mise/config.toml"
-    mise set --quiet --global "${env_key}=${env_value}"
+    mise set --quiet --global ${env_key}=${env_value}
     # mise trust --quiet $toml_file
     echo
     mise set
@@ -332,7 +356,7 @@ EOF
     local toml_file=$(__fzf-mise-set-name-value "--file <TOML_FILE> ${env_key}=${env_value}" "<TOML_FILE>")
     [ $? -ne 0 ] && { echo "Failed to get value."; return 1; }
     [ -f "$toml_file" ] || echo "[env]" > "$toml_file"
-    mise set --quiet --file $toml_file "${env_key}=${env_value}"
+    mise set --quiet --file $toml_file ${env_key}=${env_value}
     mise trust --quiet $toml_file
     echo
     mise set --file $toml_file
@@ -378,6 +402,8 @@ EOF
       "$(tput bold)upgrade:$(tput sgr0)      Upgrades outdated tool versions"
       "$(tput bold)prune:$(tput sgr0)        Delete unused versions of tools"
       " "
+      "$(tput bold)venv:$(tput sgr0)         Create a virtualenv"
+      " "
       "$(tput bold)self-update:$(tput sgr0)  Updates mise itself"
       " "
       "$(tput bold)plugins:$(tput sgr0)      Manage plugins"
@@ -410,6 +436,8 @@ EOF
       uninstall) fzf-mise-uninstall;;
       upgrade) fzf-mise-upgrade;;
       prune) fzf-mise-prune;;
+
+      venv) fzf-mise-venv;;
 
       plugins) fzf-mise-plugins;;
 
