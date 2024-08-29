@@ -56,7 +56,7 @@ function fzf-mise() {
     mise plugin ls --core | fzf --ansi --prompt="mise use > " | \
       while read -r plugin; do
         version=$(mise ls "$plugin" | fzf --ansi --prompt="mise use ${plugin} > " | awk '{print $2}')
-        scope=$(printf '%s\n' 'global' 'local' | fzf --ansi --prompt="mise use ${plugin}@${version} > " | awk '{print ($0 == "local") ? "" : $0}')
+        scope=$(printf '%s\n' '--global' '--local' | fzf --ansi --prompt="mise use ${plugin}@${version} > " | awk '{print ($0 == "--local") ? "" : $0}')
         if [ -n "$version" ]; then
           echo && mise use $scope ${plugin}@${version}
           echo && mise ls "${plugin}"
