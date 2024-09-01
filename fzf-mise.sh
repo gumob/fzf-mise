@@ -467,5 +467,5 @@ zle -N fzf-mise
 if [[ "$SHELL" == *"/bin/zsh" ]]; then
   bindkey "${FZF_MISE_KEY_BINDING}" fzf-mise
 elif [[ "$SHELL" == *"/bin/bash" ]]; then
-  bind -x "'${FZF_MISE_KEY_BINDING}': fzf_mise_runner"
+  bind -x "'${FZF_MISE_KEY_BINDING}': fzf-mise"
 fi
