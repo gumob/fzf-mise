@@ -49,6 +49,33 @@ function fzf-mise() {
     return 0
   }
 
+  local __resolve_local_toml_file() {
+    local project_dir="${PWD%/}"
+    local default_name="${MISE_DEFAULT_CONFIG_FILENAME:-mise.toml}"
+
+    if [ -f "${project_dir}/${default_name}" ]; then
+      echo "${project_dir}/${default_name}"
+    elif [ -f "${project_dir}/mise.toml" ]; then
+      echo "${project_dir}/mise.toml"
+    elif [ -f "${project_dir}/.mise.toml" ]; then
+      echo "${project_dir}/.mise.toml"
+    else
+      echo "${project_dir}/${default_name}"
+    fi
+    return 0
+  }
+
+  local __is_local_toml_file() {
+    local target_file="$1"
+    local project_dir="${PWD%/}"
+    local default_name="${MISE_DEFAULT_CONFIG_FILENAME:-mise.toml}"
+
+    if [ "$target_file" = "${project_dir}/${default_name}" ] || [ "$target_file" = "${project_dir}/mise.toml" ] || [ "$target_file" = "${project_dir}/.mise.toml" ]; then
+      return 0
+    fi
+    return 1
+  }
+
   ######################
   ### mise commands
   ######################
@@ -139,26 +166,35 @@ function fzf-mise() {
   }
 
   local fzf-mise-venv() {
-    local prompt_key=$(cat <<EOF
-$(tput setaf 4)
-.venv                           # Relative to this file's directory
-/root/.venv                     # Can be absolute path
-{{env.HOME}}/.cache/venv/myproj # Can use templates
-$(tput sgr0)
-EOF
-)
-    local venv_path=$(echo -e "$prompt_key" | fzf --ansi --pointer="" --no-mouse --marker="" --disabled --print-query --no-separator --no-info --layout=reverse-list --height=~100% --prompt="Enter path for virtualenv > ")
-    local toml_file=${$(pwd)%/}"/.mise.toml"
-    local venv_value="{ path = \"${venv_path}\", create = true }"
-    if grep -q '_.python.venv' "$toml_file"; then
-      python -m venv "$venv_path"
-      sed -i '' "s/_.python.venv = .*/_.python.venv = \"${venv_path}\"/g" "${toml_file}"
-    else
-      python -m venv "$venv_path"
-      mise set --quiet "_.python.venv=${venv_path}"
-      sed -i '' "s/\"_.python.venv\"/_.python.venv/g" "${toml_file}"
+    local sample_paths=(
+      ".venv"
+      "/root/.venv"
+      "{{env.HOME}}/.cache/venv/myproj"
+    )
+    local fzf_result=$(printf "%s\n" "${sample_paths[@]}" | fzf --ansi --print-query --prompt="Enter path for virtualenv > " --header="Type custom path or choose a sample below")
+    [ $? -ne 0 ] && { return 1; }
+
+    local query=$(printf "%s\n" "$fzf_result" | sed -n '1p')
+    local selected=$(printf "%s\n" "$fzf_result" | sed -n '2p')
+    # If user typed something, use it. Otherwise use the selected sample path.
+    local venv_path="$selected"
+    if [[ -n "${query//[[:space:]]/}" ]]; then
+      venv_path="$query"
     fi
-    mise trust --quiet $toml_file
+    # Backward-compatible guard: if an old sample line with inline comment is selected,
+    # keep only the actual path part.
+    venv_path="${venv_path%%#*}"
+    venv_path="${venv_path#"${venv_path%%[![:space:]]*}"}"
+    venv_path="${venv_path%"${venv_path##*[![:space:]]}"}"
+    if [[ -z "$venv_path" || "$venv_path" =~ ^[[:space:]]*$ ]]; then
+      echo "No virtualenv path selected"
+      return 1
+    fi
+
+    local toml_file=$(__resolve_local_toml_file)
+    python -m venv "$venv_path" || return 1
+    mise set --quiet --file "$toml_file" "_.python.venv=${venv_path}"
+    mise trust --quiet "$toml_file"
     return 0
   }
 
@@ -296,7 +332,7 @@ EOF
         return 1
     fi
 
-    local env=$(echo $envs | fzf --ansi --prompt="mise set > ")
+    local env=$(printf "%s\n" "$envs" | fzf --ansi --prompt="mise set > ")
 
     read -r env_name env_value env_file <<< "$env"
     echo "${env_name}=$(mise set $env_name)"
@@ -327,9 +363,9 @@ EOF
     local env_value=$(__fzf-mise-set-name-value "${env_key}=<VALUE>" "<VALUE>")
     [ $? -ne 0 ] && { echo "Failed to get value."; return 1; }
 
-    local toml_file=${$(pwd)%/}"/.mise.toml"
-    mise set --quiet ${env_key}=${env_value}
-    mise trust --quiet $toml_file
+    local toml_file=$(__resolve_local_toml_file)
+    mise set --quiet --file "$toml_file" ${env_key}=${env_value}
+    mise trust --quiet "$toml_file"
     echo
     mise set
     return 0
@@ -370,15 +406,14 @@ EOF
         return 1
     fi
 
-    local env=$(echo $envs | fzf --ansi --prompt="mise unset > ")
+    local env=$(printf "%s\n" "$envs" | fzf --ansi --prompt="mise unset > ")
 
     read -r env_name env_value env_file <<< "$env"
     env_file=${env_file/#\~/$HOME}
     echo "env_file: $env_file"
-    local local_toml=${$(pwd)%/}"/.mise.toml"
     local global_toml="${HOME}/.config/mise/config.toml"
 
-    if [ "$env_file" = "$local_toml" ]; then
+    if __is_local_toml_file "$env_file"; then
       mise unset "$env_name"
     elif [ "$env_file" = "$global_toml" ]; then
       mise unset "$env_name" --global
