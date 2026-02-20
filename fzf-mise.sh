@@ -49,9 +49,25 @@ function fzf-mise() {
     return 0
   }
 
+  local __default_config_filename() {
+    if [ -n "$MISE_DEFAULT_CONFIG_FILENAME" ]; then
+      echo "$MISE_DEFAULT_CONFIG_FILENAME"
+      return 0
+    fi
+
+    local from_settings
+    from_settings=$(mise settings get default_config_filename 2>/dev/null | tr -d '\n')
+    if [ -n "$from_settings" ]; then
+      echo "$from_settings"
+    else
+      echo "mise.toml"
+    fi
+    return 0
+  }
+
   local __resolve_local_toml_file() {
     local project_dir="${PWD%/}"
-    local default_name="${MISE_DEFAULT_CONFIG_FILENAME:-mise.toml}"
+    local default_name="$(__default_config_filename)"
 
     if [ -f "${project_dir}/${default_name}" ]; then
       echo "${project_dir}/${default_name}"
@@ -68,7 +84,7 @@ function fzf-mise() {
   local __is_local_toml_file() {
     local target_file="$1"
     local project_dir="${PWD%/}"
-    local default_name="${MISE_DEFAULT_CONFIG_FILENAME:-mise.toml}"
+    local default_name="$(__default_config_filename)"
 
     if [ "$target_file" = "${project_dir}/${default_name}" ] || [ "$target_file" = "${project_dir}/mise.toml" ] || [ "$target_file" = "${project_dir}/.mise.toml" ]; then
       return 0
@@ -85,7 +101,12 @@ function fzf-mise() {
         version=$(mise ls "$plugin" | fzf --ansi --prompt="mise use ${plugin} > " | awk '{print $2}')
         scope=$(printf '%s\n' '--global' '--local' | fzf --ansi --prompt="mise use ${plugin}@${version} > " | awk '{print ($0 == "--local") ? "" : $0}')
         if [ -n "$version" ]; then
-          echo && mise use $scope ${plugin}@${version}
+          if [ "$scope" = "--global" ]; then
+            echo && mise use --global "${plugin}@${version}"
+          else
+            local toml_file=$(__resolve_local_toml_file)
+            echo && mise use --path "$toml_file" "${plugin}@${version}"
+          fi
           echo && mise ls "${plugin}"
         fi
       done
