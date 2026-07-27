@@ -31,7 +31,7 @@ Please refer to the [fzf official documentation](https://github.com/junegunn/fzf
 ### Download `fzf-mise` to your home directory
 
 ```shell
-wget -O ~/.fzfmise https://raw.githubusercontent.com/gumob/fzf-mise/main/fzf-mise.sh
+wget -O ~/.fzfmise https://raw.githubusercontent.com/futamura/fzf-mise/main/fzf-mise.sh
 ```
 
 ### How to set up using key bindings
